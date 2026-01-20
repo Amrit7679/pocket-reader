@@ -7,17 +7,41 @@
 const SERVER_URL = 'http://localhost:5050';
 
 // Audio playback state
-let currentAudio = null;
+let audioContext = null;
+let currentAudioSource = null;
+let currentAudioBuffer = null;
+let audioStartTime = 0;
+let audioPauseTime = 0;
 let shouldStop = false;
 let isPaused = false;
 let playbackSpeed = 1.0;
 let currentParagraphIndex = 0;
 let totalParagraphs = 0;
-let pendingAudioUrls = []; // Track URLs to clean up on stop
 
 // Selection reading state (separate from main page reading)
-let selectionAudio = null;
+let selectionAudioContext = null;
+let selectionAudioSource = null;
 let isReadingSelection = false;
+
+/**
+ * Get or create the audio context
+ */
+function getAudioContext() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioContext;
+}
+
+/**
+ * Get or create the selection audio context
+ */
+function getSelectionAudioContext() {
+  if (!selectionAudioContext) {
+    selectionAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return selectionAudioContext;
+}
 
 // DOM element tracking for highlighting
 let readableElements = []; // Array of DOM elements that can be read
@@ -271,58 +295,73 @@ function notifyExtension(message) {
 }
 
 /**
- * Play audio from blob and return a promise
+ * Play audio from blob using Web Audio API to bypass CSP restrictions
  * Also accepts an optional onTimeUpdate callback for prefetch timing
  */
-function playAudioBlob(audioBlob, onReadyToPrefetch) {
-  return new Promise((resolve, reject) => {
+async function playAudioBlob(audioBlob, onReadyToPrefetch) {
+  return new Promise(async (resolve, reject) => {
     if (shouldStop) {
       resolve({ stopped: true });
       return;
     }
 
-    const audioUrl = URL.createObjectURL(audioBlob);
-    pendingAudioUrls.push(audioUrl);
-    currentAudio = new Audio(audioUrl);
-    currentAudio.playbackRate = playbackSpeed;
+    try {
+      const context = getAudioContext();
 
-    let prefetchTriggered = false;
+      // Convert blob to ArrayBuffer
+      const arrayBuffer = await audioBlob.arrayBuffer();
 
-    // Trigger prefetch when 70% through the audio
-    currentAudio.ontimeupdate = () => {
-      if (
-        !prefetchTriggered &&
-        currentAudio &&
-        currentAudio.duration &&
-        currentAudio.currentTime / currentAudio.duration >= 0.7
-      ) {
+      // Decode audio data
+      const audioBuffer = await context.decodeAudioData(arrayBuffer);
+
+      if (shouldStop) {
+        resolve({ stopped: true });
+        return;
+      }
+
+      // Store buffer for pause/resume
+      currentAudioBuffer = audioBuffer;
+
+      // Create source node
+      const source = context.createBufferSource();
+      source.buffer = audioBuffer;
+      source.playbackRate.value = playbackSpeed;
+      source.connect(context.destination);
+
+      currentAudioSource = source;
+
+      let prefetchTriggered = false;
+      const duration = audioBuffer.duration;
+
+      // Set up prefetch timer (at 70% of duration)
+      const prefetchTime = (duration / playbackSpeed) * 0.7 * 1000;
+      const prefetchTimer = setTimeout(() => {
         prefetchTriggered = true;
         if (onReadyToPrefetch) {
           onReadyToPrefetch();
         }
-      }
-    };
+      }, prefetchTime);
 
-    currentAudio.onended = () => {
-      URL.revokeObjectURL(audioUrl);
-      pendingAudioUrls = pendingAudioUrls.filter((u) => u !== audioUrl);
-      currentAudio = null;
-      resolve({ stopped: false });
-    };
+      // Handle completion
+      source.onended = () => {
+        clearTimeout(prefetchTimer);
+        currentAudioSource = null;
+        currentAudioBuffer = null;
+        if (!shouldStop) {
+          resolve({ stopped: false });
+        }
+      };
 
-    currentAudio.onerror = (e) => {
-      URL.revokeObjectURL(audioUrl);
-      pendingAudioUrls = pendingAudioUrls.filter((u) => u !== audioUrl);
-      currentAudio = null;
-      reject(new Error('Audio playback error'));
-    };
+      // Start playback
+      audioStartTime = context.currentTime;
+      audioPauseTime = 0;
+      source.start(0);
 
-    currentAudio.play().catch((error) => {
-      URL.revokeObjectURL(audioUrl);
-      pendingAudioUrls = pendingAudioUrls.filter((u) => u !== audioUrl);
-      currentAudio = null;
+    } catch (error) {
+      currentAudioSource = null;
+      currentAudioBuffer = null;
       reject(error);
-    });
+    }
   });
 }
 
@@ -374,7 +413,6 @@ async function readParagraphsFromIndex(paragraphs, voice, startIndex = 0, speed 
   shouldStop = false;
   isPaused = false;
   playbackSpeed = speed;
-  pendingAudioUrls = [];
   totalParagraphs = paragraphs.length;
   currentParagraphIndex = startIndex;
 
@@ -501,7 +539,6 @@ async function readText(text, voice, speed = 1.0) {
   shouldStop = false;
   isPaused = false;
   playbackSpeed = speed;
-  pendingAudioUrls = [];
 
   try {
     notifyExtension({ action: 'progress', percent: 5, text: 'Splitting into paragraphs...' });
@@ -524,17 +561,18 @@ function stopPlayback() {
   shouldStop = true;
   isPaused = false;
 
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio.src = '';
-    currentAudio = null;
+  if (currentAudioSource) {
+    try {
+      currentAudioSource.stop();
+    } catch (e) {
+      // Source might already be stopped
+    }
+    currentAudioSource = null;
   }
 
-  // Clean up any pending audio URLs
-  for (const url of pendingAudioUrls) {
-    URL.revokeObjectURL(url);
-  }
-  pendingAudioUrls = [];
+  currentAudioBuffer = null;
+  audioStartTime = 0;
+  audioPauseTime = 0;
 
   // Remove highlight
   removeHighlight();
@@ -546,8 +584,17 @@ function stopPlayback() {
  * Pause audio playback
  */
 function pausePlayback() {
-  if (currentAudio && !isPaused) {
-    currentAudio.pause();
+  if (currentAudioSource && !isPaused && audioContext) {
+    // Calculate how far we are into the audio
+    audioPauseTime = audioContext.currentTime - audioStartTime;
+
+    try {
+      currentAudioSource.stop();
+    } catch (e) {
+      // Source might already be stopped
+    }
+    currentAudioSource = null;
+
     isPaused = true;
     notifyExtension({ action: 'paused' });
   }
@@ -556,14 +603,29 @@ function pausePlayback() {
 /**
  * Resume audio playback
  */
-function resumePlayback() {
-  if (currentAudio && isPaused) {
-    currentAudio.play().catch((error) => {
+async function resumePlayback() {
+  if (isPaused && currentAudioBuffer && audioContext) {
+    try {
+      // Create new source from the same buffer
+      const source = audioContext.createBufferSource();
+      source.buffer = currentAudioBuffer;
+      source.playbackRate.value = playbackSpeed;
+      source.connect(audioContext.destination);
+
+      currentAudioSource = source;
+
+      // Resume from where we paused (accounting for playback speed)
+      const offset = audioPauseTime * playbackSpeed;
+      audioStartTime = audioContext.currentTime - audioPauseTime;
+
+      source.start(0, offset);
+
+      isPaused = false;
+      notifyExtension({ action: 'resumed' });
+    } catch (error) {
       console.error('Resume playback error:', error);
       notifyExtension({ action: 'error', text: 'Failed to resume playback' });
-    });
-    isPaused = false;
-    notifyExtension({ action: 'resumed' });
+    }
   }
 }
 
@@ -573,10 +635,13 @@ function resumePlayback() {
 function stopSelectionReading() {
   isReadingSelection = false;
 
-  if (selectionAudio) {
-    selectionAudio.pause();
-    selectionAudio.src = '';
-    selectionAudio = null;
+  if (selectionAudioSource) {
+    try {
+      selectionAudioSource.stop();
+    } catch (e) {
+      // Source might already be stopped
+    }
+    selectionAudioSource = null;
   }
 }
 
@@ -603,26 +668,32 @@ async function speakSelection(voice, speed) {
 
     if (!isReadingSelection) return; // Stopped while synthesizing
 
-    // Create and play audio
-    const audioUrl = URL.createObjectURL(audioBlob);
-    selectionAudio = new Audio(audioUrl);
-    selectionAudio.playbackRate = speed;
+    // Create and play audio using Web Audio API to bypass CSP restrictions
+    const context = getSelectionAudioContext();
 
-    selectionAudio.onended = () => {
-      URL.revokeObjectURL(audioUrl);
-      selectionAudio = null;
+    // Convert blob to ArrayBuffer
+    const arrayBuffer = await audioBlob.arrayBuffer();
+
+    // Decode audio data
+    const audioBuffer = await context.decodeAudioData(arrayBuffer);
+
+    if (!isReadingSelection) return; // Stopped while decoding
+
+    // Create source node
+    const source = context.createBufferSource();
+    source.buffer = audioBuffer;
+    source.playbackRate.value = speed;
+    source.connect(context.destination);
+
+    selectionAudioSource = source;
+
+    source.onended = () => {
+      selectionAudioSource = null;
       isReadingSelection = false;
     };
 
-    selectionAudio.onerror = (e) => {
-      URL.revokeObjectURL(audioUrl);
-      selectionAudio = null;
-      isReadingSelection = false;
-      console.error('Selection audio playback error:', e);
-      alert('Error playing audio');
-    };
-
-    await selectionAudio.play();
+    // Start playback
+    source.start(0);
 
   } catch (error) {
     isReadingSelection = false;
@@ -715,15 +786,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ status: 'resumed' });
   } else if (message.action === 'setSpeed') {
     playbackSpeed = message.speed;
-    if (currentAudio) {
-      currentAudio.playbackRate = playbackSpeed;
+    if (currentAudioSource) {
+      currentAudioSource.playbackRate.value = playbackSpeed;
     }
     sendResponse({ status: 'speed_set', speed: playbackSpeed });
   } else if (message.action === 'getPlaybackState') {
     sendResponse({
-      isPlaying: currentAudio !== null && !isPaused,
+      isPlaying: currentAudioSource !== null && !isPaused,
       isPaused: isPaused,
-      isStopped: currentAudio === null
+      isStopped: currentAudioSource === null
     });
   } else if (message.action === 'getSavedPosition') {
     const url = getNormalizedUrl();
