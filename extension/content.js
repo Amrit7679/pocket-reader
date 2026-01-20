@@ -15,6 +15,10 @@ let currentParagraphIndex = 0;
 let totalParagraphs = 0;
 let pendingAudioUrls = []; // Track URLs to clean up on stop
 
+// Selection reading state (separate from main page reading)
+let selectionAudio = null;
+let isReadingSelection = false;
+
 // DOM element tracking for highlighting
 let readableElements = []; // Array of DOM elements that can be read
 let currentHighlightedElement = null;
@@ -564,6 +568,76 @@ function resumePlayback() {
 }
 
 /**
+ * Stop selection reading
+ */
+function stopSelectionReading() {
+  isReadingSelection = false;
+
+  if (selectionAudio) {
+    selectionAudio.pause();
+    selectionAudio.src = '';
+    selectionAudio = null;
+  }
+}
+
+/**
+ * Speak selected text using context menu
+ */
+async function speakSelection(voice, speed) {
+  try {
+    // Get selected text
+    const selectedText = window.getSelection().toString().trim();
+
+    if (!selectedText) {
+      alert('No text selected');
+      return;
+    }
+
+    // Stop any previous selection audio
+    stopSelectionReading();
+
+    isReadingSelection = true;
+
+    // Synthesize the selected text
+    const audioBlob = await synthesizeParagraph(selectedText, voice);
+
+    if (!isReadingSelection) return; // Stopped while synthesizing
+
+    // Create and play audio
+    const audioUrl = URL.createObjectURL(audioBlob);
+    selectionAudio = new Audio(audioUrl);
+    selectionAudio.playbackRate = speed;
+
+    selectionAudio.onended = () => {
+      URL.revokeObjectURL(audioUrl);
+      selectionAudio = null;
+      isReadingSelection = false;
+    };
+
+    selectionAudio.onerror = (e) => {
+      URL.revokeObjectURL(audioUrl);
+      selectionAudio = null;
+      isReadingSelection = false;
+      console.error('Selection audio playback error:', e);
+      alert('Error playing audio');
+    };
+
+    await selectionAudio.play();
+
+  } catch (error) {
+    isReadingSelection = false;
+    selectionAudio = null;
+    console.error('Error speaking selection:', error);
+
+    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+      alert('Could not connect to TTS server. Make sure the server is running at http://localhost:5050');
+    } else {
+      alert('Error: ' + error.message);
+    }
+  }
+}
+
+/**
  * Listen for messages from popup or background
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -661,6 +735,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === 'clearSavedPosition') {
     clearReadingPosition();
     sendResponse({ status: 'cleared' });
+  } else if (message.action === 'speakSelection') {
+    speakSelection(message.voice, message.speed);
+    sendResponse({ status: 'started' });
   }
 
   // Return true to indicate async response

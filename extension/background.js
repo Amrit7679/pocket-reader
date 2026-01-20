@@ -159,5 +159,49 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
+/**
+ * Create context menu for speaking selected text
+ */
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: 'speakSelection',
+    title: 'Speak Selection',
+    contexts: ['selection']
+  });
+});
+
+/**
+ * Handle context menu clicks
+ */
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === 'speakSelection') {
+    try {
+      // Ensure content script is loaded
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content.js']
+        });
+      } catch (e) {
+        // Script might already be loaded
+      }
+
+      // Get saved preferences
+      const { voice, speed } = await chrome.storage.local.get(['voice', 'speed']);
+
+      // Send message to content script to speak selection
+      chrome.tabs.sendMessage(tab.id, {
+        action: 'speakSelection',
+        voice: voice || 'alba',
+        speed: speed || 1.0
+      }).catch((error) => {
+        console.error('Error sending speakSelection message:', error);
+      });
+    } catch (error) {
+      console.error('Error handling context menu click:', error);
+    }
+  }
+});
+
 // Log service worker start
 console.log('Pocket Reader background service worker started');
