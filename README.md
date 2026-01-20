@@ -68,6 +68,10 @@ The server will:
 3. Click "Load unpacked"
 4. Select the `extension` folder from this project
 
+> [!NOTE]
+> You may need to restart Chrome for the extension to be fully active. Pocket
+> Reader may also not appear in your toolbar by default.
+
 ## Usage
 
 1. Make sure the TTS server is running
@@ -128,6 +132,9 @@ curl -X POST http://localhost:5050/synthesize \
 ### Content not extracting properly
 - The extension tries to find the main article content automatically
 - Some pages with unusual layouts may not extract well
+
+### Extension not loading content
+- You may need to reload the page to have the extension's script to restart on that page
 
 ## License
 
